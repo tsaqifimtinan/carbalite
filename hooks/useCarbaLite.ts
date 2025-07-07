@@ -74,7 +74,7 @@ export const useCarbaLite = () => {
         },
         body: JSON.stringify({ 
           url,
-          format: options.type,
+          type: options.type,
           quality: options.type === 'audio' ? options.audioQuality : options.videoQuality
         }),
       });
@@ -123,7 +123,12 @@ export const useCarbaLite = () => {
             const downloadUrl = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = downloadUrl;
-            link.download = `download.${options.type === 'audio' ? 'mp3' : 'mp4'}`;
+            
+            // Use filename from backend if available, otherwise generate one
+            const filename = statusData.filename || 
+              `${validateData.info.title || 'download'}.${options.type === 'audio' ? 'mp3' : 'mp4'}`;
+            link.download = filename;
+            
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);

@@ -447,7 +447,7 @@ export default function Home() {
             <div className="animate-fade-in">
               <div className="text-center mb-12">
                 <h1 className="text-4xl md:text-6xl font-bold mb-4">
-                  About CarbaLite
+                  About carbalite
                 </h1>
                 <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 mb-8">
                   A powerful, free media downloader and converter
@@ -456,9 +456,9 @@ export default function Home() {
 
               <div className="max-w-3xl mx-auto space-y-8">
                 <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-8 border border-gray-200 dark:border-gray-800">
-                  <h2 className="text-2xl font-bold mb-4">What is CarbaLite?</h2>
+                  <h2 className="text-2xl font-bold mb-4">What is carbalite?</h2>
                   <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                    CarbaLite is a modern web-based tool for downloading and converting media content from popular platforms 
+                    carbalite is a modern web-based tool for downloading and converting media content from popular platforms 
                     like YouTube and SoundCloud. Built with cutting-edge web technologies, it provides high-quality downloads 
                     while maintaining your privacy and security.
                   </p>

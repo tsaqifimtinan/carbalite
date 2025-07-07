@@ -1,4 +1,4 @@
-# CarbaLite
+# carbalite
 
 A modern, full-stack YouTube and SoundCloud downloader with client-side processing using ffmpeg.wasm. No server-side dependencies, ready for serverless deployment.
 

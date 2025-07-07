@@ -121,50 +121,92 @@ class MediaExtractor:
                 'message': 'Extracting media information...'
             }
             
+            # Configure yt-dlp with better options
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': False,
+                'extractaudio': False,
+                'format': 'best[ext=mp4]/best[ext=webm]/best' if media_type == 'video' else 'bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio',
+            }
+            
             # Get video info
             video_info = None
-            with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 video_info = ydl.extract_info(url, download=False)
             
             self.active_downloads[task_id]['message'] = 'Finding best format...'
             
-            # Select appropriate format
+            # Select appropriate format with better logic
             selected_format = None
+            available_formats = video_info.get('formats', [])
+            
             if format_id:
                 # Find specific format
-                for fmt in video_info.get('formats', []):
+                for fmt in available_formats:
                     if fmt.get('format_id') == format_id:
                         selected_format = fmt
                         break
             else:
                 # Auto-select best format based on media type
                 if media_type == 'audio':
-                    # Find best audio-only format
-                    audio_formats = [f for f in video_info.get('formats', []) 
-                                   if f.get('vcodec') == 'none' and f.get('acodec') != 'none']
+                    # Prioritize audio-only formats with good quality
+                    audio_formats = [f for f in available_formats 
+                                   if f.get('vcodec') == 'none' and f.get('acodec') != 'none' 
+                                   and f.get('url') and f.get('filesize')]
+                    
                     if audio_formats:
-                        selected_format = max(audio_formats, key=lambda x: x.get('abr', 0) or 0)
+                        # Sort by audio bitrate, prefer higher quality
+                        audio_formats.sort(key=lambda x: x.get('abr', 0) or 0, reverse=True)
+                        selected_format = audio_formats[0]
                     else:
-                        # Fallback to best format with audio
-                        selected_format = video_info.get('formats', [{}])[0]
+                        # Fallback: find formats with audio, even if they have video
+                        mixed_formats = [f for f in available_formats 
+                                       if f.get('acodec') != 'none' and f.get('url')]
+                        if mixed_formats:
+                            mixed_formats.sort(key=lambda x: x.get('abr', 0) or 0, reverse=True)
+                            selected_format = mixed_formats[0]
                 else:
-                    # Find best video format
-                    video_formats = [f for f in video_info.get('formats', []) 
-                                   if f.get('vcodec') != 'none']
+                    # For video, find best quality video with audio
+                    video_formats = [f for f in available_formats 
+                                   if f.get('vcodec') != 'none' and f.get('acodec') != 'none' 
+                                   and f.get('url') and f.get('height')]
+                    
                     if video_formats:
-                        selected_format = max(video_formats, key=lambda x: x.get('height', 0) or 0)
+                        # Sort by resolution, prefer higher quality
+                        video_formats.sort(key=lambda x: (x.get('height', 0) or 0, x.get('abr', 0) or 0), reverse=True)
+                        selected_format = video_formats[0]
+                    else:
+                        # Fallback: any video format
+                        video_formats = [f for f in available_formats 
+                                       if f.get('vcodec') != 'none' and f.get('url')]
+                        if video_formats:
+                            video_formats.sort(key=lambda x: x.get('height', 0) or 0, reverse=True)
+                            selected_format = video_formats[0]
             
             if not selected_format or not selected_format.get('url'):
                 raise Exception("No suitable format found")
+            
+            print(f"Selected format for {media_type}: {selected_format.get('format_id')} - {selected_format.get('format_note')} - Size: {selected_format.get('filesize')}")
+            
+            # Generate proper filename with metadata
+            title = self.sanitize_filename(video_info.get('title', 'Unknown'))
+            uploader = self.sanitize_filename(video_info.get('uploader', ''))
+            ext = selected_format.get('ext', 'mp4' if media_type == 'video' else 'mp3')
+            
+            if uploader:
+                filename = f"{title} - {uploader}.{ext}"
+            else:
+                filename = f"{title}.{ext}"
             
             self.active_downloads[task_id] = {
                 'status': 'completed',
                 'progress': 100,
                 'message': 'Media stream ready!',
                 'stream_url': selected_format['url'],
+                'filename': filename,
                 'format_info': {
                     'format_id': selected_format.get('format_id'),
-                    'ext': selected_format.get('ext'),
+                    'ext': ext,
                     'filesize': selected_format.get('filesize'),
                     'abr': selected_format.get('abr'),
                     'vbr': selected_format.get('vbr'),
@@ -172,14 +214,17 @@ class MediaExtractor:
                     'width': selected_format.get('width'),
                     'height': selected_format.get('height'),
                     'acodec': selected_format.get('acodec'),
-                    'vcodec': selected_format.get('vcodec')
+                    'vcodec': selected_format.get('vcodec'),
+                    'format_note': selected_format.get('format_note')
                 },
                 'video_info': {
                     'title': video_info.get('title', 'Unknown'),
                     'uploader': video_info.get('uploader', 'Unknown'),
                     'duration': video_info.get('duration'),
                     'thumbnail': video_info.get('thumbnail'),
-                    'upload_date': video_info.get('upload_date')
+                    'upload_date': video_info.get('upload_date'),
+                    'view_count': video_info.get('view_count'),
+                    'description': video_info.get('description', '')[:500]  # Truncate description
                 }
             }
             
@@ -193,29 +238,48 @@ class MediaExtractor:
     def stream_media(self, stream_url):
         """Stream media content with proper headers for CORS"""
         try:
-            # Make request to the media URL
-            response = requests.get(stream_url, stream=True, timeout=30)
+            # Use proper headers that YouTube expects
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': '*/*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            }
+            
+            # Make request to the media URL with proper headers
+            response = requests.get(stream_url, stream=True, timeout=30, headers=headers)
             response.raise_for_status()
+            
+            # Get content length and type
+            content_length = response.headers.get('content-length', '')
+            content_type = response.headers.get('content-type', 'application/octet-stream')
             
             # Create a generator to stream the content
             def generate():
-                for chunk in response.iter_content(chunk_size=8192):
-                    yield chunk
+                for chunk in response.iter_content(chunk_size=16384):  # Larger chunks for better performance
+                    if chunk:  # Filter out keep-alive chunks
+                        yield chunk
             
             # Return response with appropriate headers
             return Response(
                 generate(),
-                content_type=response.headers.get('content-type', 'application/octet-stream'),
+                content_type=content_type,
                 headers={
-                    'Content-Length': response.headers.get('content-length', ''),
+                    'Content-Length': content_length,
                     'Accept-Ranges': 'bytes',
                     'Access-Control-Allow-Origin': '*',
                     'Access-Control-Allow-Methods': 'GET',
-                    'Access-Control-Allow-Headers': 'Range, Content-Type'
+                    'Access-Control-Allow-Headers': 'Range, Content-Type',
+                    'Cache-Control': 'no-cache',
+                    'X-Content-Type-Options': 'nosniff'
                 }
             )
             
         except Exception as e:
+            print(f"Streaming error: {e}")
             return jsonify({'error': f'Failed to stream media: {str(e)}'}), 500
 
 # Initialize extractor
