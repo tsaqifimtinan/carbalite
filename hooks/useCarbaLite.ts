@@ -20,6 +20,12 @@ interface ConversionOptions {
   type: 'audio' | 'video';
   audioQuality?: '128k' | '256k' | '320k';
   videoQuality?: '480p' | '720p' | '1080p';
+  preferences?: {
+    selectedAudioFormat?: string;
+    selectedVideoFormat?: string;
+    audioQuality?: string;
+    videoQuality?: string;
+  };
 }
 
 export const useCarbaLite = () => {
@@ -75,7 +81,12 @@ export const useCarbaLite = () => {
         body: JSON.stringify({ 
           url,
           type: options.type,
-          quality: options.type === 'audio' ? options.audioQuality : options.videoQuality
+          preferences: options.preferences || {
+            selectedAudioFormat: 'mp3',
+            selectedVideoFormat: 'mp4',
+            audioQuality: options.audioQuality || '320k',
+            videoQuality: options.videoQuality || '720p'
+          }
         }),
       });
 

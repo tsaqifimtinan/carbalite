@@ -112,8 +112,8 @@ class MediaExtractor:
                     formats.append(format_info)
         return formats
     
-    def extract_raw_media(self, url, task_id, format_id=None, media_type='audio'):
-        """Extract raw media stream for client-side processing"""
+    def extract_raw_media(self, url, task_id, format_id=None, media_type='audio', preferred_format=None, quality_settings=None):
+        """Extract raw media stream for client-side processing with user preferences"""
         try:
             self.active_downloads[task_id] = {
                 'status': 'extracting',
@@ -121,13 +121,35 @@ class MediaExtractor:
                 'message': 'Extracting media information...'
             }
             
-            # Configure yt-dlp with better options
+            # Configure yt-dlp with better options based on user preferences
             ydl_opts = {
                 'quiet': True,
                 'no_warnings': False,
                 'extractaudio': False,
-                'format': 'best[ext=mp4]/best[ext=webm]/best' if media_type == 'video' else 'bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio',
             }
+            
+            # Set format selector based on user preferences and media type
+            if media_type == 'video':
+                if preferred_format:
+                    # User specified video format preference
+                    video_quality = quality_settings.get('videoQuality', '720p') if quality_settings else '720p'
+                    height_map = {'480p': 480, '720p': 720, '1080p': 1080}
+                    max_height = height_map.get(video_quality, 720)
+                    
+                    ydl_opts['format'] = f'best[ext={preferred_format}][height<={max_height}]/best[height<={max_height}]/best[ext={preferred_format}]/best'
+                else:
+                    ydl_opts['format'] = 'best[ext=mp4]/best[ext=webm]/best'
+            else:
+                # Audio download
+                if preferred_format:
+                    # User specified audio format preference
+                    audio_quality = quality_settings.get('audioQuality', '320k') if quality_settings else '320k'
+                    quality_map = {'128k': 128, '256k': 256, '320k': 320}
+                    max_abr = quality_map.get(audio_quality, 320)
+                    
+                    ydl_opts['format'] = f'bestaudio[ext={preferred_format}][abr<={max_abr}]/bestaudio[abr<={max_abr}]/bestaudio[ext={preferred_format}]/bestaudio'
+                else:
+                    ydl_opts['format'] = 'bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio'
             
             # Get video info
             video_info = None
@@ -147,51 +169,104 @@ class MediaExtractor:
                         selected_format = fmt
                         break
             else:
-                # Auto-select best format based on media type
+                # Auto-select best format based on media type and user preferences
                 if media_type == 'audio':
-                    # Prioritize audio-only formats with good quality
-                    audio_formats = [f for f in available_formats 
-                                   if f.get('vcodec') == 'none' and f.get('acodec') != 'none' 
-                                   and f.get('url') and f.get('filesize')]
+                    # Prioritize user's preferred audio format
+                    target_format = preferred_format or 'mp3'
+                    target_quality = quality_settings.get('audioQuality', '320k') if quality_settings else '320k'
+                    quality_map = {'128k': 128, '256k': 256, '320k': 320}
+                    max_abr = quality_map.get(target_quality, 320)
                     
-                    if audio_formats:
-                        # Sort by audio bitrate, prefer higher quality
-                        audio_formats.sort(key=lambda x: x.get('abr', 0) or 0, reverse=True)
-                        selected_format = audio_formats[0]
+                    # First try: exact format match with quality preference
+                    preferred_formats = [f for f in available_formats 
+                                       if f.get('vcodec') == 'none' and f.get('acodec') != 'none' 
+                                       and f.get('ext') == target_format
+                                       and f.get('url') and (f.get('abr', 0) or 0) <= max_abr]
+                    
+                    if preferred_formats:
+                        # Sort by audio bitrate, prefer higher quality within limit
+                        preferred_formats.sort(key=lambda x: x.get('abr', 0) or 0, reverse=True)
+                        selected_format = preferred_formats[0]
                     else:
-                        # Fallback: find formats with audio, even if they have video
-                        mixed_formats = [f for f in available_formats 
-                                       if f.get('acodec') != 'none' and f.get('url')]
-                        if mixed_formats:
-                            mixed_formats.sort(key=lambda x: x.get('abr', 0) or 0, reverse=True)
-                            selected_format = mixed_formats[0]
+                        # Second try: any audio-only format with quality preference
+                        audio_formats = [f for f in available_formats 
+                                       if f.get('vcodec') == 'none' and f.get('acodec') != 'none' 
+                                       and f.get('url') and (f.get('abr', 0) or 0) <= max_abr]
+                        
+                        if audio_formats:
+                            # Sort by format preference, then quality
+                            def format_priority(fmt):
+                                ext = fmt.get('ext', '')
+                                if ext == target_format:
+                                    return (3, fmt.get('abr', 0) or 0)
+                                elif ext in ['mp3', 'm4a', 'aac']:
+                                    return (2, fmt.get('abr', 0) or 0)
+                                else:
+                                    return (1, fmt.get('abr', 0) or 0)
+                            
+                            audio_formats.sort(key=format_priority, reverse=True)
+                            selected_format = audio_formats[0]
+                        else:
+                            # Fallback: any format with audio
+                            mixed_formats = [f for f in available_formats 
+                                           if f.get('acodec') != 'none' and f.get('url')]
+                            if mixed_formats:
+                                mixed_formats.sort(key=lambda x: x.get('abr', 0) or 0, reverse=True)
+                                selected_format = mixed_formats[0]
                 else:
-                    # For video, find best quality video with audio
-                    video_formats = [f for f in available_formats 
-                                   if f.get('vcodec') != 'none' and f.get('acodec') != 'none' 
-                                   and f.get('url') and f.get('height')]
+                    # For video, find best quality video with audio based on user preferences
+                    target_format = preferred_format or 'mp4'
+                    target_quality = quality_settings.get('videoQuality', '720p') if quality_settings else '720p'
+                    height_map = {'480p': 480, '720p': 720, '1080p': 1080}
+                    max_height = height_map.get(target_quality, 720)
                     
-                    if video_formats:
-                        # Sort by resolution, prefer higher quality
-                        video_formats.sort(key=lambda x: (x.get('height', 0) or 0, x.get('abr', 0) or 0), reverse=True)
-                        selected_format = video_formats[0]
+                    # First try: exact format match with quality preference
+                    preferred_formats = [f for f in available_formats 
+                                       if f.get('vcodec') != 'none' and f.get('acodec') != 'none' 
+                                       and f.get('ext') == target_format
+                                       and f.get('url') and (f.get('height', 0) or 0) <= max_height]
+                    
+                    if preferred_formats:
+                        # Sort by resolution, prefer higher quality within limit
+                        preferred_formats.sort(key=lambda x: (x.get('height', 0) or 0, x.get('abr', 0) or 0), reverse=True)
+                        selected_format = preferred_formats[0]
                     else:
-                        # Fallback: any video format
+                        # Second try: any video format with quality preference
                         video_formats = [f for f in available_formats 
-                                       if f.get('vcodec') != 'none' and f.get('url')]
+                                       if f.get('vcodec') != 'none' and f.get('acodec') != 'none' 
+                                       and f.get('url') and (f.get('height', 0) or 0) <= max_height]
+                        
                         if video_formats:
-                            video_formats.sort(key=lambda x: x.get('height', 0) or 0, reverse=True)
+                            # Sort by format preference, then quality
+                            def format_priority(fmt):
+                                ext = fmt.get('ext', '')
+                                if ext == target_format:
+                                    return (3, fmt.get('height', 0) or 0, fmt.get('abr', 0) or 0)
+                                elif ext in ['mp4', 'webm', 'mkv']:
+                                    return (2, fmt.get('height', 0) or 0, fmt.get('abr', 0) or 0)
+                                else:
+                                    return (1, fmt.get('height', 0) or 0, fmt.get('abr', 0) or 0)
+                            
+                            video_formats.sort(key=format_priority, reverse=True)
                             selected_format = video_formats[0]
+                        else:
+                            # Fallback: any video format
+                            video_formats = [f for f in available_formats 
+                                           if f.get('vcodec') != 'none' and f.get('url')]
+                            if video_formats:
+                                video_formats.sort(key=lambda x: x.get('height', 0) or 0, reverse=True)
+                                selected_format = video_formats[0]
             
             if not selected_format or not selected_format.get('url'):
                 raise Exception("No suitable format found")
             
-            print(f"Selected format for {media_type}: {selected_format.get('format_id')} - {selected_format.get('format_note')} - Size: {selected_format.get('filesize')}")
+            print(f"Selected format for {media_type}: {selected_format.get('format_id')} - {selected_format.get('ext')} - {selected_format.get('format_note')} - Size: {selected_format.get('filesize')}")
+            print(f"User preferences - Format: {preferred_format}, Quality: {quality_settings}")
             
             # Generate proper filename with metadata
             title = self.sanitize_filename(video_info.get('title', 'Unknown'))
             uploader = self.sanitize_filename(video_info.get('uploader', ''))
-            ext = selected_format.get('ext', 'mp4' if media_type == 'video' else 'mp3')
+            ext = selected_format.get('ext', preferred_format or ('mp4' if media_type == 'video' else 'mp3'))
             
             if uploader:
                 filename = f"{title} - {uploader}.{ext}"
@@ -312,12 +387,25 @@ def validate_url():
 
 @app.route('/api/extract', methods=['POST'])
 def extract_media():
-    """Extract raw media stream for client-side processing"""
+    """Extract raw media stream for client-side processing with user preferences"""
     try:
         data = request.get_json()
         url = data.get('url', '').strip()
         media_type = data.get('type', 'audio')  # 'audio' or 'video'
         format_id = data.get('format_id')  # Optional specific format
+        
+        # User preferences from frontend
+        preferences = data.get('preferences', {})
+        preferred_format = None
+        quality_settings = {}
+        
+        if media_type == 'audio':
+            preferred_format = preferences.get('selectedAudioFormat', 'mp3')
+            quality_settings['audioQuality'] = preferences.get('audioQuality', '320k')
+        else:
+            preferred_format = preferences.get('selectedVideoFormat', 'mp4')
+            quality_settings['videoQuality'] = preferences.get('videoQuality', '720p')
+            quality_settings['audioQuality'] = preferences.get('audioQuality', '320k')
         
         if not url:
             return jsonify({'error': 'URL is required'}), 400
@@ -328,14 +416,21 @@ def extract_media():
         # Generate unique task ID
         task_id = str(uuid.uuid4())
         
-        # Start extraction in background thread
-        thread = threading.Thread(target=extractor.extract_raw_media, args=(url, task_id, format_id, media_type))
+        # Start extraction in background thread with user preferences
+        thread = threading.Thread(
+            target=extractor.extract_raw_media, 
+            args=(url, task_id, format_id, media_type, preferred_format, quality_settings)
+        )
         thread.daemon = True
         thread.start()
         
         return jsonify({
             'task_id': task_id,
-            'message': 'Media extraction started'
+            'message': f'Media extraction started with format: {preferred_format}',
+            'preferences': {
+                'format': preferred_format,
+                'quality': quality_settings
+            }
         })
         
     except Exception as e:

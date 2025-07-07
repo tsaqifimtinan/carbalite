@@ -1,21 +1,30 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import useCarbaLite from "../hooks/useCarbaLite";
+import usePreferences from "../hooks/usePreferences";
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState("save");
-  const [selectedFormat, setSelectedFormat] = useState("mp4");
   const [url, setUrl] = useState("");
-  const [videoQuality, setVideoQuality] = useState("720p");
-  const [audioQuality, setAudioQuality] = useState("320k");
 
   const { status, processMedia, reset } = useCarbaLite();
+  const { 
+    preferences, 
+    isLoaded: preferencesLoaded,
+    setSelectedVideoFormat,
+    setSelectedAudioFormat, 
+    setVideoQuality, 
+    setAudioQuality,
+    resetPreferences 
+  } = usePreferences();
+
+  const { selectedVideoFormat, selectedAudioFormat, videoQuality, audioQuality } = preferences;
 
   const videoFormats = ["mp4", "avi", "mov", "mkv", "webm", "flv"];
   const audioFormats = ["mp3", "wav", "flac", "aac", "ogg", "m4a"];
-  const imageFormats = ["jpg", "png", "webp", "gif", "bmp", "tiff"];
 
   const menuItems = [
     {
@@ -28,7 +37,12 @@ export default function Home() {
       category: "Settings",
       items: [
         { name: "Preferences", href: "#", active: currentPage === "preferences", onClick: () => setCurrentPage("preferences") },
-        { name: "About", href: "#", active: currentPage === "about", onClick: () => setCurrentPage("about") },
+      ]
+    },
+    {
+      category: "Info",
+      items: [
+        { name: "About", href: "/about", active: false, onClick: null },
       ]
     }
   ];
@@ -56,7 +70,13 @@ export default function Home() {
       const options = {
         type,
         audioQuality: audioQuality as '128k' | '256k' | '320k',
-        videoQuality: videoQuality as '480p' | '720p' | '1080p'
+        videoQuality: videoQuality as '480p' | '720p' | '1080p',
+        preferences: {
+          selectedAudioFormat,
+          selectedVideoFormat,
+          audioQuality,
+          videoQuality
+        }
       };
 
       await processMedia(url, options);
@@ -92,17 +112,31 @@ export default function Home() {
               </h3>
               <div className="space-y-1">
                 {section.items.map((item, itemIndex) => (
-                  <button
-                    key={itemIndex}
-                    onClick={item.onClick}
-                    className={`w-full text-left block px-3 py-2 rounded-md text-sm transition-colors ${
-                      item.active
-                        ? 'bg-black dark:bg-white text-white dark:text-black font-medium'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-black dark:hover:text-white'
-                    }`}
-                  >
-                    {item.name}
-                  </button>
+                  item.href === "/about" ? (
+                    <Link
+                      key={itemIndex}
+                      href={item.href}
+                      className={`w-full text-left block px-3 py-2 rounded-md text-sm transition-colors ${
+                        item.active
+                          ? 'bg-black dark:bg-white text-white dark:text-black font-medium'
+                          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-black dark:hover:text-white'
+                      }`}
+                    >
+                      {item.name}
+                    </Link>
+                  ) : (
+                    <button
+                      key={itemIndex}
+                      onClick={item.onClick!}
+                      className={`w-full text-left block px-3 py-2 rounded-md text-sm transition-colors ${
+                        item.active
+                          ? 'bg-black dark:bg-white text-white dark:text-black font-medium'
+                          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-black dark:hover:text-white'
+                      }`}
+                    >
+                      {item.name}
+                    </button>
+                  )
                 ))}
               </div>
             </div>
@@ -138,9 +172,7 @@ export default function Home() {
             </svg>
           </button>
           <h2 className="text-lg font-semibold">
-            {currentPage === "save" ? "Save Content" : 
-             currentPage === "preferences" ? "Preferences" : 
-             "About"}
+            {currentPage === "save" ? "Save Content" : "Preferences"}
           </h2>
           
           {/* Dark mode toggle placeholder */}
@@ -169,17 +201,14 @@ export default function Home() {
               {/* URL Input area */}
               <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-8 md:p-12 border border-gray-200 dark:border-gray-800 mb-8">
                 <div className="space-y-6">
-                  <div className="mx-auto w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-6">
-                    <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                    </svg>
+                  <div className="mx-auto w-20 h-20 flex items-center justify-center mb-6">
+                    <div className="vinyl-record animate-vinyl-spin">
+                      <div className="vinyl-label">♪</div>
+                    </div>
                   </div>
                   
                   <div className="text-center">
                     <h3 className="text-xl font-semibold mb-2">Enter YouTube or SoundCloud URL</h3>
-                    <p className="text-gray-500 dark:text-gray-400 mb-6">
-                      Paste the link to the content you want to download
-                    </p>
                   </div>
 
                   <div className="max-w-2xl mx-auto">
@@ -187,7 +216,7 @@ export default function Home() {
                       type="url"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
-                      placeholder="https://www.youtube.com/watch?v=... or https://soundcloud.com/..."
+                      placeholder="Paste the link here..."
                       className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-black text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-black dark:focus:ring-white focus:border-transparent"
                       disabled={status.stage !== 'idle' && status.stage !== 'completed' && status.stage !== 'error'}
                     />
@@ -265,62 +294,22 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-
-              {/* Features */}
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="text-center p-6">
-                  <div className="w-12 h-12 bg-black dark:bg-white rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-6 h-6 text-white dark:text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
-                  <h3 className="font-semibold mb-2">Lightning Fast</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Quick downloads with optimal quality
-                  </p>
-                </div>
-
-                <div className="text-center p-6">
-                  <div className="w-12 h-12 bg-black dark:bg-white rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-6 h-6 text-white dark:text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                    </svg>
-                  </div>
-                  <h3 className="font-semibold mb-2">High Quality</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    320kbps audio and 1080p video downloads
-                  </p>
-                </div>
-
-                <div className="text-center p-6">
-                  <div className="w-12 h-12 bg-black dark:bg-white rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-6 h-6 text-white dark:text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  </div>
-                  <h3 className="font-semibold mb-2">Secure</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    No data stored, completely private
-                  </p>
-                </div>
-
-                <div className="text-center p-6">
-                  <div className="w-12 h-12 bg-black dark:bg-white rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-6 h-6 text-white dark:text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                    </svg>
-                  </div>
-                  <h3 className="font-semibold mb-2">Free Forever</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    No limits, no watermarks, completely free
-                  </p>
-                </div>
-              </div>
             </div>
           )}
 
           {currentPage === "preferences" && (
             <div className="animate-fade-in">
+              {!preferencesLoaded ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="text-center">
+                    <svg className="animate-spin w-8 h-8 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <p className="text-gray-500 dark:text-gray-400">Loading preferences...</p>
+                  </div>
+                </div>
+              ) : (
+                <>
               <div className="text-center mb-12">
                 <h1 className="text-4xl md:text-6xl font-bold mb-4">
                   Preferences
@@ -331,7 +320,7 @@ export default function Home() {
               </div>
 
               {/* Format selection */}
-              <div className="grid md:grid-cols-3 gap-6 mb-8">
+              <div className="grid md:grid-cols-2 gap-6 mb-8">
                 <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800">
                   <h3 className="font-semibold mb-4 flex items-center">
                     <div className="w-8 h-8 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center mr-3">
@@ -345,9 +334,9 @@ export default function Home() {
                     {videoFormats.map((format) => (
                       <button
                         key={format}
-                        onClick={() => setSelectedFormat(format)}
+                        onClick={() => setSelectedVideoFormat(format)}
                         className={`p-2 rounded-md text-sm font-mono transition-colors ${
-                          selectedFormat === format
+                          selectedVideoFormat === format
                             ? 'bg-black dark:bg-white text-white dark:text-black'
                             : 'bg-white dark:bg-black border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
                         }`}
@@ -371,35 +360,9 @@ export default function Home() {
                     {audioFormats.map((format) => (
                       <button
                         key={format}
-                        onClick={() => setSelectedFormat(format)}
+                        onClick={() => setSelectedAudioFormat(format)}
                         className={`p-2 rounded-md text-sm font-mono transition-colors ${
-                          selectedFormat === format
-                            ? 'bg-black dark:bg-white text-white dark:text-black'
-                            : 'bg-white dark:bg-black border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
-                        }`}
-                      >
-                        {format.toUpperCase()}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800">
-                  <h3 className="font-semibold mb-4 flex items-center">
-                    <div className="w-8 h-8 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center mr-3">
-                      <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    Image Formats
-                  </h3>
-                  <div className="grid grid-cols-3 gap-2">
-                    {imageFormats.map((format) => (
-                      <button
-                        key={format}
-                        onClick={() => setSelectedFormat(format)}
-                        className={`p-2 rounded-md text-sm font-mono transition-colors ${
-                          selectedFormat === format
+                          selectedAudioFormat === format
                             ? 'bg-black dark:bg-white text-white dark:text-black'
                             : 'bg-white dark:bg-black border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
                         }`}
@@ -412,13 +375,46 @@ export default function Home() {
               </div>
 
               <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800">
-                <h3 className="font-semibold mb-4">Quality Settings</h3>
+                <div className="flex justify-between items-start mb-4">
+                  <h3 className="font-semibold">Quality Settings</h3>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={resetPreferences}
+                      className="text-xs px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      Reset to Defaults
+                    </button>
+                    {preferencesLoaded && (
+                      <div className="text-xs px-3 py-1 rounded-md bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400">
+                        Saved ✓
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Current Selection Summary */}
+                <div className="mb-6 p-4 bg-white dark:bg-black rounded-lg border border-gray-200 dark:border-gray-700">
+                  <h4 className="text-sm font-medium mb-2">Current Selections</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Video:</span>
+                      <span className="ml-2 font-mono font-semibold">{selectedVideoFormat.toUpperCase()}</span>
+                      <span className="ml-1 text-gray-500 dark:text-gray-400">@ {videoQuality}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Audio:</span>
+                      <span className="ml-2 font-mono font-semibold">{selectedAudioFormat.toUpperCase()}</span>
+                      <span className="ml-1 text-gray-500 dark:text-gray-400">@ {audioQuality}</span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">Video Quality</label>
                     <select 
                       value={videoQuality}
-                      onChange={(e) => setVideoQuality(e.target.value)}
+                      onChange={(e) => setVideoQuality(e.target.value as '480p' | '720p' | '1080p')}
                       className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-black text-black dark:text-white"
                     >
                       <option value="1080p">1080p (High)</option>
@@ -430,7 +426,7 @@ export default function Home() {
                     <label className="block text-sm font-medium mb-2">Audio Quality</label>
                     <select 
                       value={audioQuality}
-                      onChange={(e) => setAudioQuality(e.target.value)}
+                      onChange={(e) => setAudioQuality(e.target.value as '128k' | '256k' | '320k')}
                       className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-black text-black dark:text-white"
                     >
                       <option value="320k">320 kbps (High)</option>
@@ -439,61 +435,13 @@ export default function Home() {
                     </select>
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {currentPage === "about" && (
-            <div className="animate-fade-in">
-              <div className="text-center mb-12">
-                <h1 className="text-4xl md:text-6xl font-bold mb-4">
-                  About carbalite
-                </h1>
-                <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 mb-8">
-                  A powerful, free media downloader and converter
-                </p>
-              </div>
-
-              <div className="max-w-3xl mx-auto space-y-8">
-                <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-8 border border-gray-200 dark:border-gray-800">
-                  <h2 className="text-2xl font-bold mb-4">What is carbalite?</h2>
-                  <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                    carbalite is a modern web-based tool for downloading and converting media content from popular platforms 
-                    like YouTube and SoundCloud. Built with cutting-edge web technologies, it provides high-quality downloads 
-                    while maintaining your privacy and security.
-                  </p>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800">
-                    <h3 className="text-xl font-bold mb-3">Features</h3>
-                    <ul className="space-y-2 text-gray-600 dark:text-gray-400">
-                      <li>• YouTube video downloads</li>
-                      <li>• SoundCloud track downloads</li>
-                      <li>• High-quality audio extraction</li>
-                      <li>• Multiple format support</li>
-                      <li>• No registration required</li>
-                    </ul>
-                  </div>
-
-                  <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800">
-                    <h3 className="text-xl font-bold mb-3">Technology</h3>
-                    <ul className="space-y-2 text-gray-600 dark:text-gray-400">
-                      <li>• Built with Next.js & React</li>
-                      <li>• Python Flask API backend</li>
-                      <li>• Real-time progress tracking</li>
-                      <li>• Modern web standards</li>
-                      <li>• Open source</li>
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="text-center">
-                  <p className="text-gray-500 dark:text-gray-400">
-                    Version 1.0.0 • Built with ❤️ using Next.js and Python/Flask
-                  </p>
+                
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-4 text-center">
+                  Your preferences are automatically saved and will be remembered for future visits
                 </div>
               </div>
+                </>
+              )}
             </div>
           )}
         </main>
