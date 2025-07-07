@@ -3,14 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "concurrently \"npm run frontend\" \"npm run backend\" --names \"FRONTEND,BACKEND\" --prefix-colors \"cyan,magenta\" --kill-others-on-fail",
+    "frontend": "next dev --turbopack --port 3000",
+    "backend": "cd backend && python app.py",
+    "backend:setup": "cd backend && python setup.py",
+    "setup": "npm install && npm run backend:setup",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "start:prod": "concurrently \"npm run start\" \"npm run backend\" --names \"FRONTEND,BACKEND\" --prefix-colors \"cyan,magenta\"",
+    "lint": "next lint",
+    "clean": "rimraf .next node_modules backend/logs backend/__pycache__"
   },
   "dependencies": {
-    "@ffmpeg/ffmpeg": "^0.12.15",
-    "@ffmpeg/util": "^0.12.2",
     "next": "15.3.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -20,7 +24,10 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.0",
+    "rimraf": "^6.0.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "worker-loader": "^3.0.8"
   }
 }
