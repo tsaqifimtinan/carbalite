@@ -113,7 +113,7 @@ class MediaExtractor:
         return formats
     
     def extract_raw_media(self, url, task_id, format_id=None, media_type='audio', preferred_format=None, quality_settings=None):
-        """Extract raw media stream for client-side processing with user preferences"""
+        """Download media with user preferences and provide file for download"""
         try:
             self.active_downloads[task_id] = {
                 'status': 'extracting',
@@ -121,176 +121,154 @@ class MediaExtractor:
                 'message': 'Extracting media information...'
             }
             
-            # Configure yt-dlp with better options based on user preferences
-            ydl_opts = {
-                'quiet': True,
-                'no_warnings': False,
-                'extractaudio': False,
-            }
-            
-            # Set format selector based on user preferences and media type
-            if media_type == 'video':
-                if preferred_format:
-                    # User specified video format preference
-                    video_quality = quality_settings.get('videoQuality', '720p') if quality_settings else '720p'
-                    height_map = {'480p': 480, '720p': 720, '1080p': 1080}
-                    max_height = height_map.get(video_quality, 720)
-                    
-                    ydl_opts['format'] = f'best[ext={preferred_format}][height<={max_height}]/best[height<={max_height}]/best[ext={preferred_format}]/best'
-                else:
-                    ydl_opts['format'] = 'best[ext=mp4]/best[ext=webm]/best'
-            else:
-                # Audio download
-                if preferred_format:
-                    # User specified audio format preference
-                    audio_quality = quality_settings.get('audioQuality', '320k') if quality_settings else '320k'
-                    quality_map = {'128k': 128, '256k': 256, '320k': 320}
-                    max_abr = quality_map.get(audio_quality, 320)
-                    
-                    ydl_opts['format'] = f'bestaudio[ext={preferred_format}][abr<={max_abr}]/bestaudio[abr<={max_abr}]/bestaudio[ext={preferred_format}]/bestaudio'
-                else:
-                    ydl_opts['format'] = 'bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio'
-            
-            # Get video info
-            video_info = None
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # Generate filename first
+            with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
                 video_info = ydl.extract_info(url, download=False)
             
-            self.active_downloads[task_id]['message'] = 'Finding best format...'
-            
-            # Select appropriate format with better logic
-            selected_format = None
-            available_formats = video_info.get('formats', [])
-            
-            if format_id:
-                # Find specific format
-                for fmt in available_formats:
-                    if fmt.get('format_id') == format_id:
-                        selected_format = fmt
-                        break
-            else:
-                # Auto-select best format based on media type and user preferences
-                if media_type == 'audio':
-                    # Prioritize user's preferred audio format
-                    target_format = preferred_format or 'mp3'
-                    target_quality = quality_settings.get('audioQuality', '320k') if quality_settings else '320k'
-                    quality_map = {'128k': 128, '256k': 256, '320k': 320}
-                    max_abr = quality_map.get(target_quality, 320)
-                    
-                    # First try: exact format match with quality preference
-                    preferred_formats = [f for f in available_formats 
-                                       if f.get('vcodec') == 'none' and f.get('acodec') != 'none' 
-                                       and f.get('ext') == target_format
-                                       and f.get('url') and (f.get('abr', 0) or 0) <= max_abr]
-                    
-                    if preferred_formats:
-                        # Sort by audio bitrate, prefer higher quality within limit
-                        preferred_formats.sort(key=lambda x: x.get('abr', 0) or 0, reverse=True)
-                        selected_format = preferred_formats[0]
-                    else:
-                        # Second try: any audio-only format with quality preference
-                        audio_formats = [f for f in available_formats 
-                                       if f.get('vcodec') == 'none' and f.get('acodec') != 'none' 
-                                       and f.get('url') and (f.get('abr', 0) or 0) <= max_abr]
-                        
-                        if audio_formats:
-                            # Sort by format preference, then quality
-                            def format_priority(fmt):
-                                ext = fmt.get('ext', '')
-                                if ext == target_format:
-                                    return (3, fmt.get('abr', 0) or 0)
-                                elif ext in ['mp3', 'm4a', 'aac']:
-                                    return (2, fmt.get('abr', 0) or 0)
-                                else:
-                                    return (1, fmt.get('abr', 0) or 0)
-                            
-                            audio_formats.sort(key=format_priority, reverse=True)
-                            selected_format = audio_formats[0]
-                        else:
-                            # Fallback: any format with audio
-                            mixed_formats = [f for f in available_formats 
-                                           if f.get('acodec') != 'none' and f.get('url')]
-                            if mixed_formats:
-                                mixed_formats.sort(key=lambda x: x.get('abr', 0) or 0, reverse=True)
-                                selected_format = mixed_formats[0]
-                else:
-                    # For video, find best quality video with audio based on user preferences
-                    target_format = preferred_format or 'mp4'
-                    target_quality = quality_settings.get('videoQuality', '720p') if quality_settings else '720p'
-                    height_map = {'480p': 480, '720p': 720, '1080p': 1080}
-                    max_height = height_map.get(target_quality, 720)
-                    
-                    # First try: exact format match with quality preference
-                    preferred_formats = [f for f in available_formats 
-                                       if f.get('vcodec') != 'none' and f.get('acodec') != 'none' 
-                                       and f.get('ext') == target_format
-                                       and f.get('url') and (f.get('height', 0) or 0) <= max_height]
-                    
-                    if preferred_formats:
-                        # Sort by resolution, prefer higher quality within limit
-                        preferred_formats.sort(key=lambda x: (x.get('height', 0) or 0, x.get('abr', 0) or 0), reverse=True)
-                        selected_format = preferred_formats[0]
-                    else:
-                        # Second try: any video format with quality preference
-                        video_formats = [f for f in available_formats 
-                                       if f.get('vcodec') != 'none' and f.get('acodec') != 'none' 
-                                       and f.get('url') and (f.get('height', 0) or 0) <= max_height]
-                        
-                        if video_formats:
-                            # Sort by format preference, then quality
-                            def format_priority(fmt):
-                                ext = fmt.get('ext', '')
-                                if ext == target_format:
-                                    return (3, fmt.get('height', 0) or 0, fmt.get('abr', 0) or 0)
-                                elif ext in ['mp4', 'webm', 'mkv']:
-                                    return (2, fmt.get('height', 0) or 0, fmt.get('abr', 0) or 0)
-                                else:
-                                    return (1, fmt.get('height', 0) or 0, fmt.get('abr', 0) or 0)
-                            
-                            video_formats.sort(key=format_priority, reverse=True)
-                            selected_format = video_formats[0]
-                        else:
-                            # Fallback: any video format
-                            video_formats = [f for f in available_formats 
-                                           if f.get('vcodec') != 'none' and f.get('url')]
-                            if video_formats:
-                                video_formats.sort(key=lambda x: x.get('height', 0) or 0, reverse=True)
-                                selected_format = video_formats[0]
-            
-            if not selected_format or not selected_format.get('url'):
-                raise Exception("No suitable format found")
-            
-            print(f"Selected format for {media_type}: {selected_format.get('format_id')} - {selected_format.get('ext')} - {selected_format.get('format_note')} - Size: {selected_format.get('filesize')}")
-            print(f"User preferences - Format: {preferred_format}, Quality: {quality_settings}")
-            
-            # Generate proper filename with metadata
             title = self.sanitize_filename(video_info.get('title', 'Unknown'))
             uploader = self.sanitize_filename(video_info.get('uploader', ''))
-            ext = selected_format.get('ext', preferred_format or ('mp4' if media_type == 'video' else 'mp3'))
             
-            if uploader:
-                filename = f"{title} - {uploader}.{ext}"
+            # Determine final format and filename
+            if media_type == 'audio':
+                final_format = preferred_format or 'mp3'
+                if uploader:
+                    filename = f"{title} - {uploader}.{final_format}"
+                else:
+                    filename = f"{title}.{final_format}"
             else:
-                filename = f"{title}.{ext}"
+                final_format = preferred_format or 'mp4' 
+                if uploader:
+                    filename = f"{title} - {uploader}.{final_format}"
+                else:
+                    filename = f"{title}.{final_format}"
+            
+            # Create output path
+            output_path = DOWNLOAD_DIR / filename
+            temp_path = DOWNLOAD_DIR / f"temp_{task_id}"
+            
+            self.active_downloads[task_id]['message'] = 'Configuring download options...'
+            
+            # Configure yt-dlp with proper download options
+            ydl_opts = {
+                'quiet': False,
+                'no_warnings': False,
+                'outtmpl': str(temp_path / '%(title)s.%(ext)s'),
+                'extract_flat': False,
+            }
+            
+            # Configure format and post-processing based on user preferences
+            if media_type == 'audio':
+                # Audio download with quality preferences
+                audio_quality = quality_settings.get('audioQuality', '320k') if quality_settings else '320k'
+                quality_map = {'128k': '5', '256k': '0', '320k': '0'}  # ffmpeg quality scale (5=128k, 0=best)
+                ffmpeg_quality = quality_map.get(audio_quality, '0')
+                
+                if preferred_format == 'mp3':
+                    ydl_opts['format'] = 'bestaudio/best'
+                    ydl_opts['postprocessors'] = [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'mp3',
+                        'preferredquality': audio_quality.replace('k', ''),
+                    }]
+                elif preferred_format == 'wav':
+                    ydl_opts['format'] = 'bestaudio/best'
+                    ydl_opts['postprocessors'] = [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'wav',
+                    }]
+                elif preferred_format == 'flac':
+                    ydl_opts['format'] = 'bestaudio/best'
+                    ydl_opts['postprocessors'] = [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'flac',
+                    }]
+                elif preferred_format == 'aac':
+                    ydl_opts['format'] = 'bestaudio[ext=m4a]/bestaudio/best'
+                    ydl_opts['postprocessors'] = [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'aac',
+                        'preferredquality': audio_quality.replace('k', ''),
+                    }]
+                else:
+                    # Default to best audio
+                    ydl_opts['format'] = 'bestaudio/best'
+            else:
+                # Video download with quality preferences
+                video_quality = quality_settings.get('videoQuality', '720p') if quality_settings else '720p'
+                height_map = {'480p': 480, '720p': 720, '1080p': 1080, '1440p': 1440, '2160p': 2160}
+                max_height = height_map.get(video_quality, 720)
+                
+                if preferred_format == 'mp4':
+                    ydl_opts['format'] = f'best[ext=mp4][height<={max_height}]/best[height<={max_height}]/best[ext=mp4]/best'
+                elif preferred_format == 'webm':
+                    ydl_opts['format'] = f'best[ext=webm][height<={max_height}]/best[height<={max_height}]/best[ext=webm]/best'
+                elif preferred_format == 'mkv':
+                    ydl_opts['format'] = f'best[ext=mkv][height<={max_height}]/best[height<={max_height}]/best'
+                    ydl_opts['postprocessors'] = [{
+                        'key': 'FFmpegVideoConvertor',
+                        'preferedformat': 'mkv',
+                    }]
+                else:
+                    ydl_opts['format'] = f'best[height<={max_height}]/best'
+            
+            # Add progress hook
+            def progress_hook(d):
+                if d['status'] == 'downloading':
+                    if 'total_bytes' in d or 'total_bytes_estimate' in d:
+                        total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+                        downloaded = d.get('downloaded_bytes', 0)
+                        if total > 0:
+                            progress = int((downloaded / total) * 80)  # Reserve 20% for post-processing
+                            self.active_downloads[task_id].update({
+                                'progress': progress,
+                                'message': f'Downloading... {progress}%'
+                            })
+                elif d['status'] == 'finished':
+                    self.active_downloads[task_id].update({
+                        'progress': 80,
+                        'message': 'Processing audio/video...'
+                    })
+            
+            ydl_opts['progress_hooks'] = [progress_hook]
+            ydl_opts['progress_hooks'] = [progress_hook]
+            
+            # Create temp directory
+            temp_path.mkdir(exist_ok=True)
+            
+            self.active_downloads[task_id]['message'] = 'Starting download...'
+            
+            # Download with yt-dlp
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+            
+            # Find the downloaded file
+            downloaded_files = list(temp_path.glob('*'))
+            if not downloaded_files:
+                raise Exception("No file was downloaded")
+            
+            downloaded_file = downloaded_files[0]  # Get the first (should be only) file
+            
+            # Move to final location with correct filename
+            final_path = DOWNLOAD_DIR / filename
+            if final_path.exists():
+                final_path.unlink()  # Remove existing file
+            
+            downloaded_file.rename(final_path)
+            
+            # Clean up temp directory
+            shutil.rmtree(temp_path, ignore_errors=True)
             
             self.active_downloads[task_id] = {
                 'status': 'completed',
                 'progress': 100,
-                'message': 'Media stream ready!',
-                'stream_url': selected_format['url'],
+                'message': 'Download completed!',
+                'file_path': str(final_path),
                 'filename': filename,
+                'file_size': final_path.stat().st_size,
                 'format_info': {
-                    'format_id': selected_format.get('format_id'),
-                    'ext': ext,
-                    'filesize': selected_format.get('filesize'),
-                    'abr': selected_format.get('abr'),
-                    'vbr': selected_format.get('vbr'),
-                    'fps': selected_format.get('fps'),
-                    'width': selected_format.get('width'),
-                    'height': selected_format.get('height'),
-                    'acodec': selected_format.get('acodec'),
-                    'vcodec': selected_format.get('vcodec'),
-                    'format_note': selected_format.get('format_note')
+                    'ext': final_format,
+                    'media_type': media_type,
+                    'quality': quality_settings
                 },
                 'video_info': {
                     'title': video_info.get('title', 'Unknown'),
@@ -299,11 +277,15 @@ class MediaExtractor:
                     'thumbnail': video_info.get('thumbnail'),
                     'upload_date': video_info.get('upload_date'),
                     'view_count': video_info.get('view_count'),
-                    'description': video_info.get('description', '')[:500]  # Truncate description
+                    'description': video_info.get('description', '')[:500]
                 }
             }
             
         except Exception as e:
+            # Clean up temp directory on error
+            if 'temp_path' in locals():
+                shutil.rmtree(temp_path, ignore_errors=True)
+            
             self.active_downloads[task_id] = {
                 'status': 'error',
                 'progress': 0,
@@ -446,20 +428,53 @@ def get_extraction_status(task_id):
 
 @app.route('/api/stream/<task_id>', methods=['GET'])
 def stream_media(task_id):
-    """Stream the raw media for client-side processing"""
+    """Serve the downloaded file"""
     if task_id not in extractor.active_downloads:
         return jsonify({'error': 'Task not found'}), 404
     
     task = extractor.active_downloads[task_id]
     
     if task['status'] != 'completed':
-        return jsonify({'error': 'Extraction not completed'}), 400
+        return jsonify({'error': 'Download not completed'}), 400
     
-    stream_url = task.get('stream_url')
-    if not stream_url:
-        return jsonify({'error': 'Stream URL not available'}), 404
+    file_path = task.get('file_path')
+    if not file_path or not Path(file_path).exists():
+        return jsonify({'error': 'Downloaded file not found'}), 404
     
-    return extractor.stream_media(stream_url)
+    try:
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=task.get('filename', 'download'),
+            mimetype='application/octet-stream'
+        )
+    except Exception as e:
+        return jsonify({'error': f'Failed to serve file: {str(e)}'}), 500
+
+@app.route('/api/download/<task_id>', methods=['GET']) 
+def download_file(task_id):
+    """Download the processed file"""
+    if task_id not in extractor.active_downloads:
+        return jsonify({'error': 'Task not found'}), 404
+    
+    task = extractor.active_downloads[task_id]
+    
+    if task['status'] != 'completed':
+        return jsonify({'error': 'Download not completed'}), 400
+    
+    file_path = task.get('file_path')
+    if not file_path or not Path(file_path).exists():
+        return jsonify({'error': 'Downloaded file not found'}), 404
+    
+    try:
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=task.get('filename', 'download'),
+            mimetype='application/octet-stream'
+        )
+    except Exception as e:
+        return jsonify({'error': f'Failed to download file: {str(e)}'}), 500
 
 @app.route('/api/thumbnail/<task_id>', methods=['GET'])
 def get_thumbnail(task_id):
@@ -498,38 +513,52 @@ def health_check():
     return jsonify({'status': 'healthy', 'message': 'CarbaLite backend is running'})
 
 # Legacy endpoints for backward compatibility (deprecated)
-@app.route('/api/download', methods=['POST'])
+@app.route('/api/start_download', methods=['POST'])
 def start_download():
     """Legacy download endpoint - redirects to new extract endpoint"""
     return jsonify({
         'error': 'This endpoint is deprecated. Use /api/extract instead.',
-        'message': 'CarbaLite now uses client-side processing with ffmpeg.wasm'
-    }), 410
-
-@app.route('/api/download/<task_id>', methods=['GET'])
-def download_file(task_id):
-    """Legacy download endpoint - redirects to new stream endpoint"""
-    return jsonify({
-        'error': 'This endpoint is deprecated. Use /api/stream instead.',
-        'message': 'CarbaLite now uses client-side processing with ffmpeg.wasm'
+        'message': 'CarbaLite now downloads files directly with user preferences'
     }), 410
 
 def cleanup_old_tasks():
-    """Clean up old extraction tasks from memory"""
+    """Clean up old extraction tasks and downloaded files"""
     while True:
         try:
             current_time = time.time()
-            # Remove tasks older than 1 hour
+            # Remove tasks older than 1 hour and clean up files
             tasks_to_remove = []
             for task_id, task_data in extractor.active_downloads.items():
-                # Assume task was created when it was first added
-                # In a production environment, you'd want to add a timestamp
-                if len(extractor.active_downloads) > 100:  # Simple cleanup when too many tasks
+                # Simple cleanup when too many tasks (in production, add timestamps)
+                if len(extractor.active_downloads) > 100:
                     tasks_to_remove.append(task_id)
             
             for task_id in tasks_to_remove[:50]:  # Remove oldest 50 tasks
+                task_data = extractor.active_downloads.get(task_id)
+                if task_data and 'file_path' in task_data:
+                    # Clean up downloaded file
+                    try:
+                        file_path = Path(task_data['file_path'])
+                        if file_path.exists():
+                            file_path.unlink()
+                            print(f"Cleaned up file: {file_path}")
+                    except Exception as e:
+                        print(f"Error cleaning up file: {e}")
+                
                 extractor.active_downloads.pop(task_id, None)
                 print(f"Cleaned up old task: {task_id}")
+            
+            # Also clean up orphaned files in download directory
+            try:
+                for file_path in DOWNLOAD_DIR.glob('*'):
+                    if file_path.is_file():
+                        # Remove files older than 2 hours
+                        file_age = current_time - file_path.stat().st_mtime
+                        if file_age > 7200:  # 2 hours
+                            file_path.unlink()
+                            print(f"Cleaned up orphaned file: {file_path}")
+            except Exception as e:
+                print(f"Error cleaning up orphaned files: {e}")
                 
         except Exception as e:
             print(f"Error during cleanup: {e}")
@@ -543,10 +572,11 @@ cleanup_thread.start()
 
 if __name__ == '__main__':
     print("CarbaLite Backend Server Starting...")
-    print("Client-side processing with ffmpeg.wasm enabled")
+    print("Direct media download with user preferences enabled")
     print("Required dependencies: yt-dlp, requests, flask, flask-cors")
-    print("No server-side ffmpeg required!")
-    print("Ready for Vercel deployment")
+    print("FFmpeg required for audio/video processing")
+    print("Supports: MP3, WAV, FLAC, AAC, MP4, WebM, MKV")
+    print("Ready for production deployment")
     print("=" * 60)
     
     app.run(debug=True, port=5000, host='0.0.0.0')
