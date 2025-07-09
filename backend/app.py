@@ -22,7 +22,15 @@ import time
 import io
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for frontend communication
+
+# Configure CORS with specific settings
+CORS(app, 
+     origins=['*'],  # Allow all origins for development
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+     allow_headers=['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+     expose_headers=['Content-Length', 'Content-Type', 'Content-Disposition'],
+     supports_credentials=False
+)
 
 # Configuration
 DOWNLOAD_DIR = Path("downloads")
@@ -230,7 +238,6 @@ class MediaExtractor:
                     })
             
             ydl_opts['progress_hooks'] = [progress_hook]
-            ydl_opts['progress_hooks'] = [progress_hook]
             
             # Create temp directory
             temp_path.mkdir(exist_ok=True)
@@ -342,6 +349,25 @@ class MediaExtractor:
 # Initialize extractor
 extractor = MediaExtractor()
 
+# Add CORS headers to all responses
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept,Origin,X-Requested-With')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Expose-Headers', 'Content-Length,Content-Type,Content-Disposition')
+    return response
+
+# Handle preflight requests
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        response = Response()
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add('Access-Control-Allow-Headers', "Content-Type,Authorization,Accept,Origin,X-Requested-With")
+        response.headers.add('Access-Control-Allow-Methods', "GET,PUT,POST,DELETE,OPTIONS")
+        return response
+
 # Routes
 @app.route('/api/validate', methods=['POST'])
 def validate_url():
@@ -442,12 +468,16 @@ def stream_media(task_id):
         return jsonify({'error': 'Downloaded file not found'}), 404
     
     try:
-        return send_file(
+        response = send_file(
             file_path,
             as_attachment=True,
             download_name=task.get('filename', 'download'),
             mimetype='application/octet-stream'
         )
+        # Ensure CORS headers are present
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Expose-Headers'] = 'Content-Disposition'
+        return response
     except Exception as e:
         return jsonify({'error': f'Failed to serve file: {str(e)}'}), 500
 
@@ -467,12 +497,16 @@ def download_file(task_id):
         return jsonify({'error': 'Downloaded file not found'}), 404
     
     try:
-        return send_file(
+        response = send_file(
             file_path,
             as_attachment=True,
             download_name=task.get('filename', 'download'),
             mimetype='application/octet-stream'
         )
+        # Ensure CORS headers are present
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Expose-Headers'] = 'Content-Disposition'
+        return response
     except Exception as e:
         return jsonify({'error': f'Failed to download file: {str(e)}'}), 500
 
@@ -511,6 +545,16 @@ def get_thumbnail(task_id):
 def health_check():
     """Health check endpoint"""
     return jsonify({'status': 'healthy', 'message': 'CarbaLite backend is running'})
+
+@app.route('/api/cors-test', methods=['GET', 'POST', 'OPTIONS'])
+def cors_test():
+    """Test CORS configuration"""
+    return jsonify({
+        'status': 'success',
+        'message': 'CORS is working correctly',
+        'method': request.method,
+        'headers': dict(request.headers)
+    })
 
 # Legacy endpoints for backward compatibility (deprecated)
 @app.route('/api/start_download', methods=['POST'])
