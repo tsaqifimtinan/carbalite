@@ -1,24 +1,7 @@
 {
-  "routes": [
-    {
-      "src": "/api/validate",
-      "dest": "/api/validate.py"
-    },
-    {
-      "src": "/api/extract", 
-      "dest": "/api/extract.py"
-    },
-    {
-      "src": "/api/health",
-      "dest": "/api/health.py"
-    },
-    {
-      "src": "/api/status/(.*)",
-      "dest": "/api/status.py"
-    },
-    {
-      "src": "/api/download/(.*)",
-      "dest": "/api/download.py"
+  "functions": {
+    "api/*.py": {
+      "runtime": "@vercel/python"
     }
-  ]
+  }
 }
