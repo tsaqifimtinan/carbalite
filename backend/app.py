@@ -23,13 +23,26 @@ import io
 
 app = Flask(__name__)
 
+# Configuration for allowed origins
+ALLOWED_ORIGINS = [
+    'http://localhost:3000',           # Development frontend
+    'http://127.0.0.1:3000',          # Development frontend
+    'https://carbalite.vercel.app',    # Production frontend
+]
+
+# For Vercel deployment, also allow preview URLs
+if os.getenv('VERCEL_URL'):
+    ALLOWED_ORIGINS.append(f"https://{os.getenv('VERCEL_URL')}")
+
 # Configure CORS with specific settings
 CORS(app, 
-     origins=['*'],  # Allow all origins for development
+     origins=ALLOWED_ORIGINS,  # Allow specific domains
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
      expose_headers=['Content-Length', 'Content-Type', 'Content-Disposition'],
-     supports_credentials=False
+     supports_credentials=False,
+     send_wildcard=False,  # Explicitly disable wildcard
+     automatic_options=True  # Handle OPTIONS requests automatically
 )
 
 # Configuration
@@ -334,9 +347,6 @@ class MediaExtractor:
                 headers={
                     'Content-Length': content_length,
                     'Accept-Ranges': 'bytes',
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Methods': 'GET',
-                    'Access-Control-Allow-Headers': 'Range, Content-Type',
                     'Cache-Control': 'no-cache',
                     'X-Content-Type-Options': 'nosniff'
                 }
@@ -348,25 +358,6 @@ class MediaExtractor:
 
 # Initialize extractor
 extractor = MediaExtractor()
-
-# Add CORS headers to all responses
-@app.after_request
-def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept,Origin,X-Requested-With')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    response.headers.add('Access-Control-Expose-Headers', 'Content-Length,Content-Type,Content-Disposition')
-    return response
-
-# Handle preflight requests
-@app.before_request
-def handle_preflight():
-    if request.method == "OPTIONS":
-        response = Response()
-        response.headers.add("Access-Control-Allow-Origin", "*")
-        response.headers.add('Access-Control-Allow-Headers', "Content-Type,Authorization,Accept,Origin,X-Requested-With")
-        response.headers.add('Access-Control-Allow-Methods', "GET,PUT,POST,DELETE,OPTIONS")
-        return response
 
 # Routes
 @app.route('/api/validate', methods=['POST'])
@@ -474,9 +465,6 @@ def stream_media(task_id):
             download_name=task.get('filename', 'download'),
             mimetype='application/octet-stream'
         )
-        # Ensure CORS headers are present
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Expose-Headers'] = 'Content-Disposition'
         return response
     except Exception as e:
         return jsonify({'error': f'Failed to serve file: {str(e)}'}), 500
@@ -503,9 +491,6 @@ def download_file(task_id):
             download_name=task.get('filename', 'download'),
             mimetype='application/octet-stream'
         )
-        # Ensure CORS headers are present
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Expose-Headers'] = 'Content-Disposition'
         return response
     except Exception as e:
         return jsonify({'error': f'Failed to download file: {str(e)}'}), 500
@@ -532,7 +517,6 @@ def get_thumbnail(task_id):
                 thumbnail_data,
                 content_type='image/jpeg',
                 headers={
-                    'Access-Control-Allow-Origin': '*',
                     'Cache-Control': 'public, max-age=3600'
                 }
             )
