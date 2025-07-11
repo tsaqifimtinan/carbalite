@@ -93,7 +93,7 @@ export default function Home() {
       {/* Sidebar */}
       <div className={`w-64 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 lg:z-auto`}>
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-800">
-          <h1 className="text-xl font-bold tracking-tight">carbalite.</h1>
+          <h1 className="text-xl font-extrabold tracking-tight">carbalite.</h1>
           <button
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
@@ -171,7 +171,7 @@ export default function Home() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <h2 className="text-lg font-semibold">
+          <h2 className="text-lg font-bold">
             {currentPage === "save" ? "Save Content" : "Preferences"}
           </h2>
           
@@ -191,11 +191,12 @@ export default function Home() {
             <div className="animate-fade-in">
               {/* Hero section */}
               <div className="text-center mb-12">
-                <h1 className="text-4xl md:text-6xl font-bold mb-4">
+                <h1 className="text-4xl md:text-6xl font-extrabold mb-4">
                   Save Content
-                </h1>                  <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 mb-8">
-                    Download and convert YouTube videos and SoundCloud tracks using client-side processing
-                  </p>
+                </h1>
+                <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 mb-8 font-medium">
+                  Download and convert YouTube videos and SoundCloud tracks using client-side processing
+                </p>
               </div>
 
               {/* URL Input area */}
@@ -208,7 +209,7 @@ export default function Home() {
                   </div>
                   
                   <div className="text-center">
-                    <h3 className="text-xl font-semibold mb-2">Enter YouTube or SoundCloud URL</h3>
+                    <h3 className="text-xl font-bold mb-2">Enter YouTube or SoundCloud URL</h3>
                   </div>
 
                   <div className="max-w-2xl mx-auto">
@@ -226,7 +227,7 @@ export default function Home() {
                     <button
                       onClick={() => handleUrlSubmit('audio')}
                       disabled={status.stage !== 'idle' && status.stage !== 'completed' && status.stage !== 'error' || !url.trim()}
-                      className="bg-black dark:bg-white text-white dark:text-black px-8 py-3 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="bg-black dark:bg-white text-white dark:text-black px-8 py-3 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       {status.stage !== 'idle' && status.stage !== 'completed' && status.stage !== 'error' ? (
                         <svg className="animate-spin w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -243,7 +244,7 @@ export default function Home() {
                     <button
                       onClick={() => handleUrlSubmit('video')}
                       disabled={status.stage !== 'idle' && status.stage !== 'completed' && status.stage !== 'error' || !url.trim()}
-                      className="bg-gray-100 dark:bg-gray-800 text-black dark:text-white px-8 py-3 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="bg-gray-100 dark:bg-gray-800 text-black dark:text-white px-8 py-3 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       {status.stage !== 'idle' && status.stage !== 'completed' && status.stage !== 'error' ? (
                         <svg className="animate-spin w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -265,7 +266,7 @@ export default function Home() {
                           <svg className="animate-spin w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                           </svg>
-                          <span className="text-sm font-medium">{status.message}</span>
+                          <span className="text-sm font-bold">{status.message}</span>
                         </div>
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                           <div 
@@ -273,14 +274,14 @@ export default function Home() {
                             style={{ width: `${status.progress}%` }}
                           ></div>
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center font-medium">
                           {Math.round(status.progress)}% complete
                         </div>
                         {status.videoInfo && (
                           <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                             <div className="text-sm">
-                              <div className="font-medium truncate">{status.videoInfo.title}</div>
-                              <div className="text-gray-500 dark:text-gray-400 text-xs">{status.videoInfo.uploader}</div>
+                              <div className="font-bold truncate">{status.videoInfo.title}</div>
+                              <div className="text-gray-500 dark:text-gray-400 text-xs font-medium">{status.videoInfo.uploader}</div>
                             </div>
                           </div>
                         )}
@@ -288,7 +289,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  <div className="text-center text-sm text-gray-500 dark:text-gray-400">
+                  <div className="text-center text-sm text-gray-500 dark:text-gray-400 font-medium">
                     <p>Supported platforms: YouTube, SoundCloud</p>
                     <p>Audio quality: Up to 320kbps | Video quality: Up to 1080p</p>
                   </div>
@@ -311,10 +312,10 @@ export default function Home() {
               ) : (
                 <>
               <div className="text-center mb-12">
-                <h1 className="text-4xl md:text-6xl font-bold mb-4">
+                <h1 className="text-4xl md:text-6xl font-extrabold mb-4">
                   Preferences
                 </h1>
-                <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 mb-8">
+                <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 mb-8 font-medium">
                   Configure your download and conversion settings
                 </p>
               </div>
@@ -322,7 +323,7 @@ export default function Home() {
               {/* Format selection */}
               <div className="grid md:grid-cols-2 gap-6 mb-8">
                 <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800">
-                  <h3 className="font-semibold mb-4 flex items-center">
+                  <h3 className="font-bold mb-4 flex items-center">
                     <div className="w-8 h-8 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center mr-3">
                       <svg className="w-4 h-4 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -348,7 +349,7 @@ export default function Home() {
                 </div>
 
                 <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800">
-                  <h3 className="font-semibold mb-4 flex items-center">
+                  <h3 className="font-bold mb-4 flex items-center">
                     <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center mr-3">
                       <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
@@ -376,7 +377,7 @@ export default function Home() {
 
               <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800">
                 <div className="flex justify-between items-start mb-4">
-                  <h3 className="font-semibold">Quality Settings</h3>
+                  <h3 className="font-bold">Quality Settings</h3>
                   <div className="flex gap-2">
                     <button
                       onClick={resetPreferences}
@@ -394,24 +395,24 @@ export default function Home() {
                 
                 {/* Current Selection Summary */}
                 <div className="mb-6 p-4 bg-white dark:bg-black rounded-lg border border-gray-200 dark:border-gray-700">
-                  <h4 className="text-sm font-medium mb-2">Current Selections</h4>
+                  <h4 className="text-sm font-bold mb-2">Current Selections</h4>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-gray-500 dark:text-gray-400">Video:</span>
-                      <span className="ml-2 font-mono font-semibold">{selectedVideoFormat.toUpperCase()}</span>
-                      <span className="ml-1 text-gray-500 dark:text-gray-400">@ {videoQuality}</span>
+                      <span className="text-gray-500 dark:text-gray-400 font-medium">Video:</span>
+                      <span className="ml-2 font-mono font-bold">{selectedVideoFormat.toUpperCase()}</span>
+                      <span className="ml-1 text-gray-500 dark:text-gray-400 font-medium">@ {videoQuality}</span>
                     </div>
                     <div>
-                      <span className="text-gray-500 dark:text-gray-400">Audio:</span>
-                      <span className="ml-2 font-mono font-semibold">{selectedAudioFormat.toUpperCase()}</span>
-                      <span className="ml-1 text-gray-500 dark:text-gray-400">@ {audioQuality}</span>
+                      <span className="text-gray-500 dark:text-gray-400 font-medium">Audio:</span>
+                      <span className="ml-2 font-mono font-bold">{selectedAudioFormat.toUpperCase()}</span>
+                      <span className="ml-1 text-gray-500 dark:text-gray-400 font-medium">@ {audioQuality}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium mb-2">Video Quality</label>
+                    <label className="block text-sm font-bold mb-2">Video Quality</label>
                     <select 
                       value={videoQuality}
                       onChange={(e) => setVideoQuality(e.target.value as '480p' | '720p' | '1080p')}
@@ -423,7 +424,7 @@ export default function Home() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2">Audio Quality</label>
+                    <label className="block text-sm font-bold mb-2">Audio Quality</label>
                     <select 
                       value={audioQuality}
                       onChange={(e) => setAudioQuality(e.target.value as '128k' | '256k' | '320k')}
@@ -436,7 +437,7 @@ export default function Home() {
                   </div>
                 </div>
                 
-                <div className="text-xs text-gray-500 dark:text-gray-400 mb-4 text-center">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-4 text-center font-medium">
                   Your preferences are automatically saved and will be remembered for future visits
                 </div>
               </div>

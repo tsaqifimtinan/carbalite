@@ -32,7 +32,7 @@ export interface ProcessMediaOptions {
 class CarbaLiteClient {
   private backendUrl: string;
 
-  constructor(backendUrl = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000') {
+  constructor(backendUrl = 'https://carbalite-backend.vercel.app/api') {
     this.backendUrl = backendUrl;
   }
 

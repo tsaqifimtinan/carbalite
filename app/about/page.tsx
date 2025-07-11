@@ -62,7 +62,7 @@ export default function AboutPage() {
 
             <div className="text-center">
               <p className="text-gray-500 dark:text-gray-400">
-                Version 1.0.0 • Built with ❤️ using Next.js and Python/Flask
+                Version 1.0.1 • Built with ❤️ using Next.js and Python/Flask
               </p>
             </div>
           </div>
